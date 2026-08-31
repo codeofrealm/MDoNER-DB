@@ -1,0 +1,292 @@
+-- ============================================
+-- MDoNER - Landslide Risk Monitoring System
+-- PostgreSQL Sample Database
+-- ============================================
+
+CREATE DATABASE landslide_monitoring;
+
+-- Connect to the database:
+-- \c landslide_monitoring
+
+
+-- 1. Monitoring locations
+CREATE TABLE monitoring_locations (
+    location_id SERIAL PRIMARY KEY,
+    location_name VARCHAR(150) NOT NULL,
+    state VARCHAR(100) NOT NULL,
+    district VARCHAR(100),
+    latitude DECIMAL(10, 7) NOT NULL,
+    longitude DECIMAL(10, 7) NOT NULL,
+    elevation_m DECIMAL(8, 2),
+    slope_angle DECIMAL(5, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- 2. Sensors installed at locations
+CREATE TABLE sensors (
+    sensor_id SERIAL PRIMARY KEY,
+    location_id INT NOT NULL REFERENCES monitoring_locations(location_id),
+    sensor_type VARCHAR(50) NOT NULL,
+    sensor_code VARCHAR(50) UNIQUE NOT NULL,
+    installation_date DATE,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    last_maintenance_date DATE
+);
+
+
+-- 3. Weather/environment observations
+CREATE TABLE environmental_readings (
+    reading_id BIGSERIAL PRIMARY KEY,
+    location_id INT NOT NULL REFERENCES monitoring_locations(location_id),
+    recorded_at TIMESTAMP NOT NULL,
+    rainfall_mm DECIMAL(8, 2) DEFAULT 0,
+    rainfall_24h_mm DECIMAL(8, 2),
+    rainfall_72h_mm DECIMAL(8, 2),
+    temperature_c DECIMAL(5, 2),
+    humidity_percent DECIMAL(5, 2),
+    soil_moisture_percent DECIMAL(5, 2),
+    groundwater_level_m DECIMAL(8, 2)
+);
+
+
+-- 4. Historical landslide events
+CREATE TABLE landslide_events (
+    event_id SERIAL PRIMARY KEY,
+    location_id INT NOT NULL REFERENCES monitoring_locations(location_id),
+    event_date TIMESTAMP NOT NULL,
+    severity VARCHAR(20),
+    estimated_volume_m3 DECIMAL(12, 2),
+    casualties INT DEFAULT 0,
+    road_blocked BOOLEAN DEFAULT FALSE,
+    description TEXT
+);
+
+
+-- 5. AI/ML risk predictions
+CREATE TABLE risk_predictions (
+    prediction_id BIGSERIAL PRIMARY KEY,
+    location_id INT NOT NULL REFERENCES monitoring_locations(location_id),
+    prediction_time TIMESTAMP NOT NULL,
+    risk_score DECIMAL(5, 2) CHECK (risk_score >= 0 AND risk_score <= 100),
+    risk_level VARCHAR(20) NOT NULL,
+    probability DECIMAL(5, 4),
+    model_version VARCHAR(50),
+    contributing_factors JSONB,
+    recommended_action TEXT
+);
+
+
+-- 6. Early warning alerts
+CREATE TABLE alerts (
+    alert_id BIGSERIAL PRIMARY KEY,
+    location_id INT NOT NULL REFERENCES monitoring_locations(location_id),
+    prediction_id BIGINT REFERENCES risk_predictions(prediction_id),
+    alert_level VARCHAR(20) NOT NULL,
+    alert_message TEXT NOT NULL,
+    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    acknowledged_at TIMESTAMP,
+    acknowledged_by VARCHAR(100),
+    status VARCHAR(20) DEFAULT 'ACTIVE'
+);
+
+
+-- 7. Users / officials
+CREATE TABLE system_users (
+    user_id SERIAL PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    role VARCHAR(50) NOT NULL,
+    department VARCHAR(150),
+    state VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- ============================================
+-- SAMPLE DATA
+-- ============================================
+
+INSERT INTO monitoring_locations
+(location_name, state, district, latitude, longitude, elevation_m, slope_angle)
+VALUES
+('Tawang Landslide Zone', 'Arunachal Pradesh', 'Tawang',
+ 27.5860, 91.8590, 3048, 38.5),
+
+('Gangtok Hillside', 'Sikkim', 'East Sikkim',
+ 27.3389, 88.6065, 1650, 42.0),
+
+('Aizawl Hill Zone', 'Mizoram', 'Aizawl',
+ 23.7271, 92.7176, 1132, 45.5),
+
+('Shillong Bypass', 'Meghalaya', 'East Khasi Hills',
+ 25.5788, 91.8933, 1496, 35.0),
+
+('Kohima Mountain Zone', 'Nagaland', 'Kohima',
+ 25.6751, 94.1086, 1444, 40.2);
+
+
+INSERT INTO sensors
+(location_id, sensor_type, sensor_code, installation_date)
+VALUES
+(1, 'Rain Gauge', 'RG-TAW-001', '2025-06-15'),
+(1, 'Soil Moisture', 'SM-TAW-001', '2025-06-15'),
+(1, 'Tilt Sensor', 'TS-TAW-001', '2025-06-20'),
+(2, 'Rain Gauge', 'RG-GAN-001', '2025-07-10'),
+(2, 'Ground Movement', 'GM-GAN-001', '2025-07-10'),
+(3, 'Rain Gauge', 'RG-AIZ-001', '2025-07-20'),
+(4, 'Soil Moisture', 'SM-SHL-001', '2025-07-25');
+
+
+INSERT INTO environmental_readings
+(location_id, recorded_at, rainfall_mm, rainfall_24h_mm,
+ rainfall_72h_mm, temperature_c, humidity_percent,
+ soil_moisture_percent, groundwater_level_m)
+VALUES
+(1, '2026-08-31 15:00:00', 18.5, 92.4, 214.8, 16.2, 91.5, 78.4, 5.8),
+(2, '2026-08-31 15:00:00', 12.2, 76.8, 180.5, 19.1, 88.2, 71.6, 8.2),
+(3, '2026-08-31 15:00:00', 25.7, 124.5, 298.2, 22.5, 94.1, 84.7, 4.3),
+(4, '2026-08-31 15:00:00', 8.4, 51.2, 132.7, 18.9, 86.5, 65.3, 9.1),
+(5, '2026-08-31 15:00:00', 15.8, 89.6, 201.4, 20.2, 90.2, 76.8, 6.7);
+
+
+INSERT INTO landslide_events
+(location_id, event_date, severity, estimated_volume_m3,
+ casualties, road_blocked, description)
+VALUES
+(1, '2025-08-14 09:30:00', 'HIGH', 1850, 0, TRUE,
+ 'Major debris movement following heavy rainfall'),
+
+(2, '2025-07-22 14:10:00', 'MEDIUM', 420, 0, FALSE,
+ 'Localized slope failure'),
+
+(3, '2024-06-18 07:45:00', 'HIGH', 2300, 2, TRUE,
+ 'Major landslide affecting hillside road');
+
+
+INSERT INTO risk_predictions
+(location_id, prediction_time, risk_score, risk_level,
+ probability, model_version, contributing_factors, recommended_action)
+VALUES
+(
+  1,
+  '2026-08-31 15:05:00',
+  86.50,
+  'CRITICAL',
+  0.8650,
+  'LSTM-v2.1',
+  '{"rainfall_24h":92.4,"rainfall_72h":214.8,
+    "soil_moisture":78.4,"slope_angle":38.5}',
+  'Evacuate vulnerable areas and restrict road traffic'
+),
+(
+  2,
+  '2026-08-31 15:05:00',
+  68.20,
+  'HIGH',
+  0.6820,
+  'LSTM-v2.1',
+  '{"rainfall_24h":76.8,"soil_moisture":71.6,
+    "slope_angle":42.0}',
+  'Increase monitoring frequency and issue local warning'
+),
+(
+  3,
+  '2026-08-31 15:05:00',
+  91.70,
+  'CRITICAL',
+  0.9170,
+  'LSTM-v2.1',
+  '{"rainfall_24h":124.5,"rainfall_72h":298.2,
+    "soil_moisture":84.7,"slope_angle":45.5}',
+  'Immediate evacuation of high-risk settlements'
+),
+(
+  4,
+  '2026-08-31 15:05:00',
+  42.30,
+  'MEDIUM',
+  0.4230,
+  'LSTM-v2.1',
+  '{"rainfall_24h":51.2,"soil_moisture":65.3}',
+  'Continue routine monitoring'
+);
+
+
+INSERT INTO alerts
+(location_id, prediction_id, alert_level, alert_message)
+VALUES
+(
+  1, 1, 'CRITICAL',
+  'Critical landslide risk detected at Tawang Landslide Zone.'
+),
+(
+  2, 2, 'HIGH',
+  'High landslide probability detected. Increase monitoring.'
+),
+(
+  3, 3, 'CRITICAL',
+  'Immediate landslide warning for Aizawl Hill Zone.'
+);
+
+
+INSERT INTO system_users
+(name, email, phone, role, department, state)
+VALUES
+('Rajesh Kumar', 'rajesh@example.gov.in', '9876543210',
+ 'District Officer', 'District Disaster Management Authority',
+ 'Arunachal Pradesh'),
+
+('Anita Sharma', 'anita@example.gov.in', '9876543211',
+ 'Monitoring Officer', 'MDoNER', 'Delhi');
+
+
+-- ============================================
+-- USEFUL QUERIES
+-- ============================================
+
+-- Current high/critical risk locations
+SELECT
+    l.location_name,
+    l.state,
+    l.district,
+    r.risk_score,
+    r.risk_level,
+    r.probability,
+    r.prediction_time
+FROM risk_predictions r
+JOIN monitoring_locations l
+    ON r.location_id = l.location_id
+WHERE r.risk_level IN ('HIGH', 'CRITICAL')
+ORDER BY r.risk_score DESC;
+
+
+-- Latest environmental readings
+SELECT
+    l.location_name,
+    l.state,
+    e.rainfall_24h_mm,
+    e.rainfall_72h_mm,
+    e.soil_moisture_percent,
+    e.recorded_at
+FROM environmental_readings e
+JOIN monitoring_locations l
+    ON e.location_id = l.location_id
+ORDER BY e.recorded_at DESC;
+
+
+-- Active critical alerts
+SELECT
+    a.alert_id,
+    l.location_name,
+    l.state,
+    a.alert_level,
+    a.alert_message,
+    a.issued_at
+FROM alerts a
+JOIN monitoring_locations l
+    ON a.location_id = l.location_id
+WHERE a.status = 'ACTIVE'
+  AND a.alert_level = 'CRITICAL'
+ORDER BY a.issued_at DESC;
